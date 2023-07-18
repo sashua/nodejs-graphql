@@ -1,15 +1,17 @@
 import { Profile } from '@prisma/client';
 import { GraphQLFieldConfig, GraphQLNonNull } from 'graphql';
 import { Context } from '../context.js';
-import { ProfileType } from '../types/profile.js';
 import { UUIDType } from '../types/uuid.js';
 
 interface Args {
   id: Profile['id'];
 }
 
-export const profile: GraphQLFieldConfig<void, Context, Args> = {
-  type: ProfileType,
+export const deleteProfile: GraphQLFieldConfig<void, Context, Args> = {
+  type: new GraphQLNonNull(UUIDType),
   args: { id: { type: new GraphQLNonNull(UUIDType) } },
-  resolve: (_source, { id }, ctx) => ctx.prisma.profile.findUnique({ where: { id } }),
+  resolve: async (_source, { id }, ctx) => {
+    const profile = await ctx.prisma.profile.delete({ where: { id } });
+    return profile.id;
+  },
 };
