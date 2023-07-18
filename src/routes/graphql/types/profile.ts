@@ -1,10 +1,18 @@
 import { Profile } from '@prisma/client';
-import { GraphQLBoolean, GraphQLInt, GraphQLNonNull, GraphQLObjectType } from 'graphql';
+import DataLoader from 'dataloader';
+import {
+  GraphQLBoolean,
+  GraphQLFieldResolver,
+  GraphQLInt,
+  GraphQLNonNull,
+  GraphQLObjectType,
+} from 'graphql';
 import { Context } from '../context.js';
 import { MemberTypeIdType } from './member-type-id.js';
 import { MemberTypeType } from './member-type.js';
 import { UUIDType } from './uuid.js';
 
+// ----------------------------------------------------------------
 export const ProfileType = new GraphQLObjectType<Profile, Context>({
   name: 'Profile',
   fields: () => ({
@@ -15,8 +23,29 @@ export const ProfileType = new GraphQLObjectType<Profile, Context>({
     memberTypeId: { type: MemberTypeIdType },
     memberType: {
       type: new GraphQLNonNull(MemberTypeType),
-      resolve: (source, _args, ctx) =>
-        ctx.prisma.memberType.findUnique({ where: { id: source.memberTypeId } }),
+      resolve: resolveMemberType,
     },
   }),
 });
+
+// ----------------------------------------------------------------
+// Resolvers
+// ----------------------------------------------------------------
+const resolveMemberType: GraphQLFieldResolver<Profile, Context> = (
+  source,
+  _args,
+  ctx,
+  info,
+) => {
+  let loader = ctx.loaders.get(info.fieldNodes);
+  if (!loader) {
+    loader = new DataLoader(async (ids: readonly string[]) => {
+      const types = await ctx.prisma.memberType.findMany({
+        where: { id: { in: [...ids] } },
+      });
+      return ids.map((id) => types.find((types) => types.id === id));
+    });
+    ctx.loaders.set(info.fieldNodes, loader);
+  }
+  return loader.load(source.memberTypeId);
+};
