@@ -35,9 +35,8 @@ const resolveMemberType: GraphQLFieldResolver<Profile, Context> = (
   source,
   _args,
   ctx,
-  info,
 ) => {
-  let loader = ctx.loaders.get(info.fieldNodes);
+  let loader = ctx.loaders.get('memberType');
   if (!loader) {
     loader = new DataLoader(async (ids: readonly string[]) => {
       const types = await ctx.prisma.memberType.findMany({
@@ -45,7 +44,7 @@ const resolveMemberType: GraphQLFieldResolver<Profile, Context> = (
       });
       return ids.map((id) => types.find((types) => types.id === id));
     });
-    ctx.loaders.set(info.fieldNodes, loader);
+    ctx.loaders.set('memberType', loader);
   }
   return loader.load(source.memberTypeId);
 };

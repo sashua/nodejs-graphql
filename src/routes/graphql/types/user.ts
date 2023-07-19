@@ -8,6 +8,8 @@ import {
   GraphQLString,
 } from 'graphql';
 import { Context } from '../context.js';
+import { createSubscribedToUserLoader } from '../loaders/subscribed-to-user.js';
+import { createUserSubscribedToLoader } from '../loaders/user-subscribed-to.js';
 import { PostType } from './post.js';
 import { ProfileType } from './profile.js';
 import { UUIDType } from './uuid.js';
@@ -35,13 +37,8 @@ export const UserType = new GraphQLObjectType<User, Context>({
 // ----------------------------------------------------------------
 // Resolvers
 // ----------------------------------------------------------------
-const resolveProfile: GraphQLFieldResolver<User, Context> = (
-  source,
-  _args,
-  ctx,
-  info,
-) => {
-  let loader = ctx.loaders.get(info.fieldNodes);
+const resolveProfile: GraphQLFieldResolver<User, Context> = (source, _args, ctx) => {
+  let loader = ctx.loaders.get('profile');
   if (!loader) {
     loader = new DataLoader(async (ids: readonly string[]) => {
       const profiles = await ctx.prisma.profile.findMany({
@@ -49,14 +46,14 @@ const resolveProfile: GraphQLFieldResolver<User, Context> = (
       });
       return ids.map((id) => profiles.find((profile) => profile.userId === id));
     });
-    ctx.loaders.set(info.fieldNodes, loader);
+    ctx.loaders.set('profile', loader);
   }
   return loader.load(source.id);
 };
 
 // ----------------------------------------------------------------
-const resolvePosts: GraphQLFieldResolver<User, Context> = (source, _args, ctx, info) => {
-  let loader = ctx.loaders.get(info.fieldNodes);
+const resolvePosts: GraphQLFieldResolver<User, Context> = (source, _args, ctx) => {
+  let loader = ctx.loaders.get('posts');
   if (!loader) {
     loader = new DataLoader(async (ids: readonly string[]) => {
       const posts = await ctx.prisma.post.findMany({
@@ -72,7 +69,7 @@ const resolvePosts: GraphQLFieldResolver<User, Context> = (source, _args, ctx, i
       );
       return ids.map((id) => groupedPosts[id]);
     });
-    ctx.loaders.set(info.fieldNodes, loader);
+    ctx.loaders.set('posts', loader);
   }
   return loader.load(source.id);
 };
@@ -82,26 +79,11 @@ const resolveUserSubscribedTo: GraphQLFieldResolver<User, Context> = async (
   source,
   _args,
   ctx,
-  info,
 ) => {
-  let loader = ctx.loaders.get(info.fieldNodes);
+  let loader = ctx.loaders.get('userSubscribedTo');
   if (!loader) {
-    loader = new DataLoader(async (ids: readonly string[]) => {
-      const subs = await ctx.prisma.subscribersOnAuthors.findMany({
-        where: { subscriberId: { in: [...ids] } },
-        select: { subscriberId: true, author: true },
-      });
-      const groupedAuthors = subs.reduce(
-        (acc, { subscriberId, author }) => {
-          if (!acc[subscriberId]) acc[subscriberId] = [];
-          acc[subscriberId].push(author);
-          return acc;
-        },
-        {} as Record<string, User[]>,
-      );
-      return ids.map((id) => groupedAuthors[id]);
-    });
-    ctx.loaders.set(info.fieldNodes, loader);
+    loader = createUserSubscribedToLoader(ctx);
+    ctx.loaders.set('userSubscribedTo', loader);
   }
   return loader.load(source.id);
 };
@@ -111,26 +93,11 @@ const resolveSubscribedToUser: GraphQLFieldResolver<User, Context> = async (
   source,
   _args,
   ctx,
-  info,
 ) => {
-  let loader = ctx.loaders.get(info.fieldNodes);
+  let loader = ctx.loaders.get('subscribedToUser');
   if (!loader) {
-    loader = new DataLoader(async (ids: readonly string[]) => {
-      const subs = await ctx.prisma.subscribersOnAuthors.findMany({
-        where: { authorId: { in: [...ids] } },
-        select: { authorId: true, subsriber: true },
-      });
-      const groupedSubsribers = subs.reduce(
-        (acc, { authorId, subsriber }) => {
-          if (!acc[authorId]) acc[authorId] = [];
-          acc[authorId].push(subsriber);
-          return acc;
-        },
-        {} as Record<string, User[]>,
-      );
-      return ids.map((id) => groupedSubsribers[id]);
-    });
-    ctx.loaders.set(info.fieldNodes, loader);
+    loader = createSubscribedToUserLoader(ctx);
+    ctx.loaders.set('subscribedToUser', loader);
   }
   return loader.load(source.id);
 };

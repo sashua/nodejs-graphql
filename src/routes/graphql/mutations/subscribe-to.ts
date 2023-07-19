@@ -15,11 +15,18 @@ export const subscribeTo: GraphQLFieldConfig<void, Context, Args> = {
     userId: { type: new GraphQLNonNull(UUIDType) },
     authorId: { type: new GraphQLNonNull(UUIDType) },
   },
-  resolve: async (_source, { userId, authorId }, ctx) => {
-    const result = await ctx.prisma.subscribersOnAuthors.create({
-      data: { subscriberId: userId, authorId },
-      include: { author: true },
+  resolve: (_source, { userId, authorId }, ctx) => {
+    return ctx.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        userSubscribedTo: {
+          create: {
+            authorId,
+          },
+        },
+      },
     });
-    return result.author;
   },
 };
